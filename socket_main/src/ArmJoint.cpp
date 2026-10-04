@@ -1,20 +1,25 @@
 /**
  * @file ArmJoint.cpp
  * @author David Sharpe (ds0196@uah.edu)
- * @brief 
+ * @brief
  *
  */
 
 #include "ArmJoint.h"
+#include "AstraMotors.h"
 
 
-ArmJoint::ArmJoint(AS5047P* setEncoder, float setZeroAngle, float setMinAngle, float setMaxAngle, int setGearRatio, bool setInverted) {
+ArmJoint::ArmJoint(AstraMotors* setMotor, AS5047P* setEncoder, float setZeroAngle, float setMinAngle, float setMaxAngle,
+                   int setGearRatio, bool setInverted) {
+    motor = setMotor;
     encoder = setEncoder;
     zeroAngle = setZeroAngle;
     gearRatio = setGearRatio;
     inverted = setInverted;
 
     targetAngle = 0;
+    targetVelocity = 0;
+    setpointType = SETPOINT_ANGLE;
     lastEncoderAngle = 0;
     lastEncoderReadTime = 0;
     minAngle = setMinAngle;
@@ -33,12 +38,24 @@ float ArmJoint::readAngle() {
     return lastEffectiveAngle;
 }
 
+void ArmJoint::readREVVelocity(int rpm) {
+    rpm *= -1;
+    lastREVVelocity = rpm;
+    lastREVReadTime = millis();
+
+    // Convert motor RPM to joint deg/s
+    // Lowest gear ratio is 468, largest is 5000
+    // Meaning, in practice, values range from 6.0 to 128.2
+    lastDegSVelocity = float(rpm) * (360.0 / 6.0) / float(gearRatio);
+}
+
 double ArmJoint::pid(double pTargetAngle) {
     double error = clamp_angle(pTargetAngle - lastEffectiveAngle);
     if (abs(error) < PRECISION)
         return 0;  // Stop if +/- 1 degree
-    
-    error = (error / 360.0) * static_cast<double>(gearRatio);  // Convert to motor rotations from gearbox degrees
+
+    error =
+        (error / 360.0) * static_cast<double>(gearRatio);  // Convert to motor rotations from gearbox degrees
 
     integral += error * (dt / 1000.0);
     double derivative = (error - prevError) / (dt / 1000.0);
@@ -54,19 +71,38 @@ float ArmJoint::updateIKMotion() {
     if (static_cast<long>(millis()) - lastEncoderReadTime > dt)
         return 0;  // Don't move if encoder data is too old
 
-    double pidTargetAngle = targetAngle;  // Will come from S-curve
+    // Calculate motor RPM required to achieve either absolute angle setpoint or velocity setpoint
+    float motorRPM = 0;
+    if (setpointType == SETPOINT_ANGLE) {
+        double pidTargetAngle = targetAngle;  // Will come from S-curve
 
-    float motorRPM = pid(targetAngle);
-    if (motorRPM == 0) {
+        motorRPM = pid(targetAngle);
+    } else {
+        if (targetVelocity == 0)
+            return 0;
+
+        // Perform bounds checking -- joint shall not exceed min/max angles within one second
+        float projectedAngle = lastEffectiveAngle + targetVelocity;
+        if (lastEffectiveAngle > maxAngle || lastEffectiveAngle < minAngle) {
+            targetVelocity = 0;
+        } else if (projectedAngle < minAngle) {
+            targetVelocity = minAngle - lastEffectiveAngle;
+        } else if (projectedAngle > maxAngle) {
+            targetVelocity = maxAngle - lastEffectiveAngle;
+        }
+
+        // Convert deg/sec to motor RPM
+        motorRPM = targetVelocity * (60.0 / 360.0) * float(gearRatio);
+    }
+    if (motorRPM == 0)
         return 0;
-    }
 
-    motorRPM = clamp_velocity(motorRPM);  // Keep non-zero velocity within MIN_SPEED and MAX_SPEED
+    motorRPM = clamp_velocity(motorRPM);  // Bound motor RPM within MIN_SPEED and MAX_SPEED
 
-    if (inverted) {
-        motorRPM = -motorRPM;
-    }
-    return -1 * motorRPM;
+    if (inverted)
+        motorRPM *= -1;
+
+    return -1 * motorRPM;  // Motors turn in the opposite direction of our joint angle convention
 }
 
 
