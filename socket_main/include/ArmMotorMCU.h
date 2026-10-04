@@ -1,5 +1,5 @@
 /**
- * @file ARM.h
+ * @file ArmMotorMCU.h
  * @author David Sharpe (ds0196@uah.edu)
  * @brief Arm
  *
