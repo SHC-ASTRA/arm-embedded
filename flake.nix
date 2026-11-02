@@ -22,7 +22,7 @@
         );
     in
     {
-      formatter.x86_64-linux = inputs.nixpkgs.legacyPackages.x86_64-linux.nixfmt-tree;
+      formatter = forEachSupportedSystem ({pkgs, ...}: pkgs.nixfmt-tree);
 
       devShells = forEachSupportedSystem (
         { pkgs, system }:
