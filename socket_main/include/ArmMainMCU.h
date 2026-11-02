@@ -6,8 +6,34 @@
  */
 #pragma once
 
+#if !defined(ARDUINO_ESP32_S3_DEVKITC_1)
 
-#if !defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
+//------------------------------------------------------------------------------------------------//
+//  ESP32 S3 Devkit C V1 (URC 2026, Socket V1)
+//------------------------------------------------------------------------------------------------//
+
+#    define NEOPIXEL_PIN 48
+
+#    define SPI_MOSI 38
+#    define SPI_MISO 2
+#    define SPI_CLK 47
+
+#    define ENCODER_AXIS0_PIN 37
+#    define ENCODER_AXIS1_PIN 1
+#    define ENCODER_AXIS2_PIN 4
+#    define ENCODER_AXIS3_PIN 7
+
+#    define CAN_TX 17
+#    define CAN_RX 18
+
+#    define PIN_VDIV_BATT 8
+#    define PIN_VDIV_12V 10
+#    define PIN_VDIV_5V 6
+#    define PIN_VDIV_3V3 3
+
+#    define MOTOR_AMOUNT 4
+
+#elif !defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
 
 //------------------------------------------------------------------------------------------------//
 //   DOIT ESP32 Devkit V1 (URC 2025, Socket V2)
