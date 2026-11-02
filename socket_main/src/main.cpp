@@ -347,6 +347,8 @@ void loop() {
                             armMotors[i]->status1.sensorVelocity);
             }
         }
+        vicCAN.send(59, axis0.lastDegSVelocity * 100, axis1.lastDegSVelocity * 100, axis2.lastDegSVelocity * 100,
+                    axis3.lastDegSVelocity * 100);
     }
 
     if (trigger(versionFeedback)) {
@@ -483,6 +485,15 @@ void loop() {
                 Serial.println("Perhaps this was meant for digit?");
             }
 #endif
+        } else if (commandID == 43) {  // IK Velocity setpoint
+            if (canData.size() == 4) {
+                CtrlCmdTimeout.lastMillis = millis();
+                float velocities[4] = {0};
+                for (int i = 0; i < 4; i++) {
+                    velocities[i] = canData[i] / 10.0;
+                }
+                arm.setTargetVelocities(velocities);
+            }
         }
     } else if (isRevCan) {                                         // REV Motor Feedback
         uint8_t deviceId = receivedFrame.identifier & 0x3F;        // [5:0]
@@ -499,6 +510,7 @@ void loop() {
             for (int i = 0; i < 4; i++) {
                 if (deviceId == armMotors[i]->getID()) {
                     armMotors[i]->parseStatus(apiId, receivedFrame.data);
+                    joints[i]->readREVVelocity(armMotors[i]->status1.sensorVelocity);
                     break;
                 }
             }
